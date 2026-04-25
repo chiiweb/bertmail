@@ -29,7 +29,6 @@
       justify-content: center;
       padding: 1.5rem;
       font-family: 'Source Serif Pro', 'Inter', serif;
-      
       background-color: #d4c5b0;
       background-image: 
         radial-gradient(circle at 20% 30%, rgba(160, 120, 80, 0.25) 0%, transparent 40%),
@@ -351,13 +350,6 @@
 </div>
 
 <script>
-  // ============================================
-  // API KEY CONFIGURATION
-  // ============================================
-  // REPLACE THIS WITH YOUR OPENROUTER API KEY
-  const OPENROUTER_API_KEY = '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';
-  // ============================================
-
   (function(){
     'use strict';
 
@@ -426,7 +418,7 @@
       content: 'Hi Team,\n\nJust a reminder about our project sync tomorrow at 10:00 AM EST. I\'ve attached the latest mockups and the agenda for your review.\n\nPlease let me know if you have any additional topics to add.\n\nBest regards,\nSarah Johnson\nProduct Manager' 
     };
 
-    // ---------- AI CLASSIFICATION ----------
+    // ---------- AI CLASSIFICATION via /api/proxy ----------
     async function classifyWithAI(sender, keywords, emailContent) {
       const prompt = `You are a spam detection expert. Analyze the following email and determine if it is SPAM or HAM (legitimate).
       
@@ -443,13 +435,11 @@ Respond with ONLY a JSON object in this exact format:
   "reasoning": "Brief explanation"
 }`;
 
+      // API key lives safely in the Vercel environment variable — never in frontend code!
       const response = await fetch('/api/proxy', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'BERT Chronicle Spam Filter'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           model: 'qwen/qwen3-next-80b-a3b-instruct:free',
@@ -462,7 +452,7 @@ Respond with ONLY a JSON object in this exact format:
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`API error: ${response.status} — ${error}`);
       }
 
       const data = await response.json();
@@ -578,11 +568,12 @@ Respond with ONLY a JSON object in this exact format:
         const content = emailTextarea.value;
 
         let result;
-        if (OPENROUTER_API_KEY && OPENROUTER_API_KEY !== 'YOUR_OPENROUTER_API_KEY_HERE') {
+        try {
           result = await classifyWithAI(sender, keywords, content);
-        } else {
+        } catch (aiErr) {
+          console.warn('AI failed, using fallback:', aiErr.message);
           result = fallbackClassification(sender, keywords, content);
-          result.reasoning = 'Using fallback (add API key for AI)';
+          result.reasoning = `Heuristic fallback (${aiErr.message})`;
         }
         
         const badge = result.isSpam ? 'spam-badge' : 'ham-badge';
